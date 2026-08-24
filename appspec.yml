@@ -12,12 +12,16 @@ permissions:
     group: ec2-user
 
 hooks:
+  ApplicationStop:
+    - location: deploy_scripts/stop.sh
+      timeout: 300
+      runas: root
   BeforeInstall:
     - location: deploy_scripts/install.sh
       timeout: 300
       runas: root
-  ApplicationStop:
-    - location: deploy_scripts/stop.sh
+  AfterInstall:
+    - location: deploy_scripts/after_install.sh
       timeout: 300
       runas: ec2-user
   ApplicationStart:
