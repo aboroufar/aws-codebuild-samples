@@ -12,12 +12,12 @@ ENTRY_POINT="service.js"
 
 cd "$APP_DIR"
 
-# Clean up any existing PM2 instance
+# Stop existing instance if any
 pm2 delete "$APP_NAME" || true
 
-# Start the application on port 80
-PORT=80 pm2 start "$ENTRY_POINT" --name "$APP_NAME"
+# Pass 80 as a CLI argument to service.js via PM2
+pm2 start "$ENTRY_POINT" --name "$APP_NAME" -- 80
 pm2 save
 
-echo "=== [ApplicationStart] Application started on port 80 ==="
+echo "=== [ApplicationStart] Started on port 80 ==="
 exit 0
