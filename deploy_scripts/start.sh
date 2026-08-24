@@ -1,16 +1,23 @@
 #!/bin/bash
 set -euo pipefail
+set -x
 
-cd /home/ec2-user/calculator
+echo "=== [ApplicationStart] Starting Calculator Service ==="
 
+export PATH=$PATH:/usr/bin:/usr/local/bin:/usr/sbin:/usr/local/sbin
+
+APP_DIR="/home/ec2-user/calculator"
 APP_NAME="calculator"
-ENTRY_POINT="app.js"
+ENTRY_POINT="service.js"
 
-# Start or reload via PM2 on port 80
-if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
-  PORT=80 pm2 restart "$APP_NAME" --update-env
-else
-  PORT=80 pm2 start "$ENTRY_POINT" --name "$APP_NAME"
-fi
+cd "$APP_DIR"
 
+# Clean up any existing PM2 instance
+pm2 delete "$APP_NAME" || true
+
+# Start the application on port 80
+PORT=80 pm2 start "$ENTRY_POINT" --name "$APP_NAME"
 pm2 save
+
+echo "=== [ApplicationStart] Application started on port 80 ==="
+exit 0
