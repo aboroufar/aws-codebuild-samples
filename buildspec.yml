@@ -26,15 +26,15 @@ phases:
       - "echo Pushing the Docker images to ECR..."
       - "docker push $REPOSITORY_URI:latest"
       - "docker push $REPOSITORY_URI:$IMAGE_TAG"
-      - "echo Updating container image URI using jq..."
-      - "jq --arg IMAGE \"$REPOSITORY_URI:$IMAGE_TAG\" '.containerDefinitions[0].image = $IMAGE' taskdef.json > taskdef_updated.json"
+      - "echo Resolving task definition placeholders with jq..."
+      - "EXEC_ROLE_ARN=\"arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-execution-role\""
+      - "TASK_ROLE_ARN=\"arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-task-role\""
+      - "jq --arg IMG \"$REPOSITORY_URI:$IMAGE_TAG\" --arg EXEC \"$EXEC_ROLE_ARN\" --arg TASK \"$TASK_ROLE_ARN\" '.containerDefinitions[0].image = $IMG | .executionRoleArn = $EXEC | .taskRoleArn = $TASK' taskdef.json > taskdef_updated.json"
       - "echo Registering task definition in ECS..."
       - "aws ecs register-task-definition --cli-input-json file://taskdef_updated.json > taskdef_output.json"
       - "TASK_DEF_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' taskdef_output.json)"
       - "echo Registered Task Definition ARN: $TASK_DEF_ARN"
-      - "echo Updating appspec.yml..."
       - "sed -i \"s|#TASK_DEFINITION#|$TASK_DEF_ARN|g\" appspec.yml"
-
 artifacts:
   files:
     - appspec.yml
