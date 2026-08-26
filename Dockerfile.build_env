@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 8080
 
 # Ensure the app starts and listens on 0.0.0.0:8080
-CMD ["node", "server.js"]
+CMD ["node", "service.js"]
