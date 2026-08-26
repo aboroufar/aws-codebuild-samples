@@ -8,31 +8,31 @@ env:
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
-      - aws --version
-      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_TAG=${COMMIT_HASH:=$IMAGE_TAG}
+      - "echo Logging in to Amazon ECR..."
+      - "aws --version"
+      - "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"
+      - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
+      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - "COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)"
+      - "IMAGE_TAG=${COMMIT_HASH:=$IMAGE_TAG}"
   build:
     commands:
-      - echo Building the Docker image...
-      - docker build -f Dockerfile.build_env -t $IMAGE_REPO_NAME:latest .
-      - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG
-      - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:latest
+      - "echo Building the Docker image..."
+      - "docker build -f Dockerfile.build_env -t $IMAGE_REPO_NAME:latest ."
+      - "docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG"
+      - "docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:latest"
   post_build:
     commands:
-      - echo Pushing the Docker images to ECR...
-      - docker push $REPOSITORY_URI:latest
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Updating container image URI in taskdef.json...
-      - sed -i "s|<IMAGE1_NAME>|$REPOSITORY_URI:$IMAGE_TAG|g" taskdef.json
-      - echo Registering new Task Definition in ECS dynamically...
-      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
-      - echo "Registered Task Definition ARN: $TASK_DEF_ARN"
-      - echo Injecting Task Definition ARN into appspec.yaml...
-      - sed -i "s|<TASK_DEFINITION>|$TASK_DEF_ARN|g" appspec.yaml
+      - "echo Pushing the Docker images to ECR..."
+      - "docker push $REPOSITORY_URI:latest"
+      - "docker push $REPOSITORY_URI:$IMAGE_TAG"
+      - "echo Updating container image URI in taskdef.json..."
+      - "sed -i \"s|#IMAGE1_NAME#|$REPOSITORY_URI:$IMAGE_TAG|g\" taskdef.json"
+      - "echo Registering new Task Definition in ECS dynamically..."
+      - "TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)"
+      - "echo Registered Task Definition ARN: $TASK_DEF_ARN"
+      - "echo Injecting Task Definition ARN into appspec.yaml..."
+      - "sed -i \"s|#TASK_DEFINITION#|$TASK_DEF_ARN|g\" appspec.yaml"
 
 artifacts:
   files:
