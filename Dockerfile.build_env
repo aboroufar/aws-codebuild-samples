@@ -1,12 +1,22 @@
-FROM node:4-alpine
+# Stage 1: Build & Dependencies
+FROM node:18-alpine AS builder
 
-WORKDIR /root
+WORKDIR /app
 
-COPY package.json npm-shrinkwrap.json ./
+COPY package*.json ./
+RUN npm install --production
 
-RUN apk update \
-    && apk upgrade \
-    && apk add bash \
-    && npm install \
-    && mv node_modules node_modules_cache \
-    && rm -r package.json npm-shrinkwrap.json /tmp/*
+# Stage 2: Production Runtime
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+
+# Expose the port defined in your ALB/ECS configuration
+EXPOSE 8080
+
+# Ensure the app starts and listens on 0.0.0.0:8080
+CMD ["node", "server.js"]
