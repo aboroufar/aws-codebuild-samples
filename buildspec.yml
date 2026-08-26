@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    IMAGE_REPO_NAME: "node-calculator-build-environment"
+    IMAGE_REPO_NAME: "blue-green-demo-repo"
     IMAGE_TAG: "latest"
 
 phases:
@@ -38,7 +38,7 @@ phases:
 
 artifacts:
   files:
-    - appspec.yaml
+    - appspec.yml
     - taskdef.json
     - imageDetail.json
     - imagedefinitions.json
