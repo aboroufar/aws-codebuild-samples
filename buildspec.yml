@@ -35,6 +35,7 @@ phases:
       - "TASK_DEF_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' taskdef_output.json)"
       - "echo Registered Task Definition ARN: $TASK_DEF_ARN"
       - "sed -i \"s|#TASK_DEFINITION#|$TASK_DEF_ARN|g\" appspec.yml"
+      - "cat appspec.yml" 
 artifacts:
   files:
     - appspec.yml
