@@ -26,15 +26,16 @@ phases:
       - "echo Pushing the Docker images to ECR..."
       - "docker push $REPOSITORY_URI:latest"
       - "docker push $REPOSITORY_URI:$IMAGE_TAG"
-      - "echo Updating container image URI in taskdef.json..."
-      - "sed -i \"s|#IMAGE1_NAME#|$REPOSITORY_URI:$IMAGE_TAG|g\" taskdef.json"
-      - "echo Registering new Task Definition in ECS dynamically..."
-      - "TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)"
+      - "echo Updating container image URI using jq..."
+      - "jq --arg IMAGE \"$REPOSITORY_URI:$IMAGE_TAG\" '.containerDefinitions[0].image = $IMAGE' taskdef.json > taskdef_updated.json"
+      - "echo Registering task definition in ECS..."
+      - "aws ecs register-task-definition --cli-input-json file://taskdef_updated.json > taskdef_output.json"
+      - "TASK_DEF_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' taskdef_output.json)"
       - "echo Registered Task Definition ARN: $TASK_DEF_ARN"
-      - "echo Injecting Task Definition ARN into appspec.yaml..."
-      - "sed -i \"s|#TASK_DEFINITION#|$TASK_DEF_ARN|g\" appspec.yaml"
+      - "echo Updating appspec.yml..."
+      - "sed -i \"s|#TASK_DEFINITION#|$TASK_DEF_ARN|g\" appspec.yml"
 
 artifacts:
   files:
     - appspec.yml
-    - taskdef.json
+    - taskdef_updated.json
