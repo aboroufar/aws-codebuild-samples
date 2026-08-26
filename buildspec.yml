@@ -17,28 +17,24 @@ phases:
       - IMAGE_TAG=${COMMIT_HASH:=$IMAGE_TAG}
   build:
     commands:
-      - echo Build started on `date`
       - echo Building the Docker image...
       - docker build -f Dockerfile.build_env -t $IMAGE_REPO_NAME:latest .
       - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG
       - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:latest
   post_build:
     commands:
-      - echo Build completed on `date`
       - echo Pushing the Docker images to ECR...
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Substituting template variables in taskdef.json...
+      - echo Updating container image URI in taskdef.json...
       - sed -i "s|<IMAGE1_NAME>|$REPOSITORY_URI:$IMAGE_TAG|g" taskdef.json
-      - sed -i "s|<ECS_TASK_EXECUTION_ROLE_ARN>|$TASK_EXECUTION_ROLE_ARN|g" taskdef.json
-      - sed -i "s|<ECS_TASK_ROLE_ARN>|$TASK_ROLE_ARN|g" taskdef.json
-      - echo Generating CodeDeploy deployment artifacts...
-      - printf '{"ImageURI":"%s"}' "$REPOSITORY_URI:$IMAGE_TAG" > imageDetail.json
-      - printf '[{"name":"app","imageUri":"%s"}]' "$REPOSITORY_URI:$IMAGE_TAG" > imagedefinitions.json
+      - echo Registering new Task Definition in ECS dynamically...
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      - echo "Registered Task Definition ARN: $TASK_DEF_ARN"
+      - echo Injecting Task Definition ARN into appspec.yaml...
+      - sed -i "s|<TASK_DEFINITION>|$TASK_DEF_ARN|g" appspec.yaml
 
 artifacts:
   files:
     - appspec.yml
     - taskdef.json
-    - imageDetail.json
-    - imagedefinitions.json
