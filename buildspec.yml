@@ -5,6 +5,8 @@ phases:
     commands:
       - "echo Logging in to Amazon ECR..."
       - "aws --version"
+      # Fallback to repo name if variable not passed
+      - "IMAGE_REPO_NAME=${IMAGE_REPO_NAME:-blue-green-demo-repo}"
       - "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"
       - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
       - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
