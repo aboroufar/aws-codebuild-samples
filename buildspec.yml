@@ -1,41 +1,33 @@
 version: 0.2
 
-env:
-  variables:
-    IMAGE_REPO_NAME: "blue-green-demo-repo"
-    IMAGE_TAG: "latest"
-
 phases:
   pre_build:
     commands:
-      - "echo Logging in to Amazon ECR..."
-      - "aws --version"
-      - "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"
-      - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
-      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
-      - "COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)"
-      - "IMAGE_TAG=${COMMIT_HASH:=$IMAGE_TAG}"
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:-latest}
+
   build:
     commands:
-      - "echo Building the Docker image..."
-      - "docker build -f Dockerfile.build_env -t $IMAGE_REPO_NAME:latest ."
-      - "docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG"
-      - "docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:latest"
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+
   post_build:
     commands:
-      - "echo Pushing the Docker images to ECR..."
-      - "docker push $REPOSITORY_URI:latest"
-      - "docker push $REPOSITORY_URI:$IMAGE_TAG"
-      - "echo Resolving task definition placeholders with jq..."
-      - "EXEC_ROLE_ARN=\"arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-execution-role\""
-      - "TASK_ROLE_ARN=\"arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-task-role\""
-      - "jq --arg IMG \"$REPOSITORY_URI:$IMAGE_TAG\" --arg EXEC \"$EXEC_ROLE_ARN\" --arg TASK \"$TASK_ROLE_ARN\" '.containerDefinitions[0].image = $IMG | .executionRoleArn = $EXEC | .taskRoleArn = $TASK' taskdef.json > taskdef_updated.json"
-      - "echo Registering task definition in ECS..."
-      - "aws ecs register-task-definition --cli-input-json file://taskdef_updated.json > taskdef_output.json"
-      - "TASK_DEF_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' taskdef_output.json)"
-      - "echo Registered Task Definition ARN: $TASK_DEF_ARN"
-      - "sed -i \"s|#TASK_DEFINITION#|$TASK_DEF_ARN|g\" appspec.yml"
-      - "cat appspec.yml" 
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Updating task definition template with the new image URI and role ARNs...
+      - EXEC_ROLE_ARN="arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-execution-role"
+      - TASK_ROLE_ARN="arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-task-role"
+      - jq --arg IMG "$REPOSITORY_URI:$IMAGE_TAG" --arg EXEC "$EXEC_ROLE_ARN" --arg TASK "$TASK_ROLE_ARN" '.containerDefinitions[0].image = $IMG | .executionRoleArn = $EXEC | .taskRoleArn = $TASK' taskdef.json > taskdef_updated.json
+
 artifacts:
   files:
     - appspec.yml
