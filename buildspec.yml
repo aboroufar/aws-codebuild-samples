@@ -1,36 +1,48 @@
 version: 0.2
 
 phases:
-  pre_build:
+  install:
+    runtime-versions:
+      nodejs: 18
     commands:
-      - "echo Logging in to Amazon ECR..."
-      - "aws --version"
-      # Fallback to repo name if variable not passed
-      - "IMAGE_REPO_NAME=${IMAGE_REPO_NAME:-blue-green-demo-repo}"
-      - "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"
-      - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME"
-      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
-      - "COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)"
-      - "IMAGE_TAG=${COMMIT_HASH:-latest}"
-
+      - echo Installing production dependencies...
+      - npm install --production
   build:
     commands:
-      - "echo Building the Docker image..."
-      - "docker build -f Dockerfile -t $IMAGE_REPO_NAME:latest ."
-      - "docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG"
-      - "docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:latest"
-
+      - echo Packaging Lambda code into zip...
+      - zip -rq function.zip service.js calculator.js lambda.js index.html node_modules/ package.json
   post_build:
     commands:
-      - "echo Pushing the Docker images to ECR..."
-      - "docker push $REPOSITORY_URI:latest"
-      - "docker push $REPOSITORY_URI:$IMAGE_TAG"
-      - "echo Resolving task definition placeholders with jq..."
-      - "EXEC_ROLE_ARN=\"arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-execution-role\""
-      - "TASK_ROLE_ARN=\"arn:aws:iam::$AWS_ACCOUNT_ID:role/blue-green-demo-ecs-task-role\""
-      - "jq --arg IMG \"$REPOSITORY_URI:$IMAGE_TAG\" --arg EXEC \"$EXEC_ROLE_ARN\" --arg TASK \"$TASK_ROLE_ARN\" '.containerDefinitions[0].image = $IMG | .executionRoleArn = $EXEC | .taskRoleArn = $TASK' taskdef.json > taskdef_updated.json"
+      - echo Updating Lambda function code and publishing new version...
+      - FUNCTION_NAME="${FUNCTION_NAME:-blue-green-demo-function}"
+      - ALIAS_NAME="${ALIAS_NAME:-live}"
       
+      # 1. Update function code & publish a new version
+      - aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb://function.zip
+      - aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+      - TARGET_VERSION=$(aws lambda publish-version --function-name "$FUNCTION_NAME" --query "Version" --output text)
+      
+      # 2. Get the current version active on the alias
+      - CURRENT_VERSION=$(aws lambda get-alias --function-name "$FUNCTION_NAME" --name "$ALIAS_NAME" --query "FunctionVersion" --output text)
+      
+      - echo "Shifting traffic from Version $CURRENT_VERSION to Target Version $TARGET_VERSION"
+
+      # 3. Dynamically generate the AppSpec file for CodeDeploy
+      # When deploying to AWS Lambda with CodeDeploy, CodeDeploy does not create or publish new 
+      # Lambda versions automatically like it does for ECS task definitions.
+      - |
+        cat <<EOF > appspec.yaml
+        version: 0.0
+        Resources:
+          - TargetService:
+              Type: AWS::Lambda::Function
+              Properties:
+                Name: "$FUNCTION_NAME"
+                Alias: "$ALIAS_NAME"
+                CurrentVersion: "$CURRENT_VERSION"
+                TargetVersion: "$TARGET_VERSION"
+        EOF
+
 artifacts:
   files:
-    - appspec.yml
-    - taskdef_updated.json
+    - appspec.yaml

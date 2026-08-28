@@ -1,9 +1,9 @@
 version: 0.0
 Resources:
-  - TargetService:
-      Type: AWS::ECS::Service
+  - MyFunction:
+      Type: AWS::Lambda::Function
       Properties:
-        TaskDefinition: <TASK_DEFINITION>
-        LoadBalancerInfo:
-          ContainerName: "app"
-          ContainerPort: 8080
+        Name: "blue-green-demo-function"
+        Alias: "live"
+        CurrentVersion: "1"
+        TargetVersion: "2"
