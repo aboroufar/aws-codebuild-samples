@@ -1,5 +1,5 @@
 const serverlessExpress = require('@codegenie/serverless-express');
-const app = require('./app');
+const app = require('./service'); // <-- Changed from './app' to './service'
 
 let serverlessExpressInstance;
 
