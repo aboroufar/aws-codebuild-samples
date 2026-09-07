@@ -29,7 +29,7 @@ phases:
       - git config --global user.email "ci-bot@yourdomain.com"
       - git config --global user.name "CodeBuild CI"
       - git clone https://${GITHUB_TOKEN}@github.com/<your-org-or-user>/gitops-workloads.git
-      - cd gitops-workloads/apps/blue-green-demo/environments/prod
+      - cd gitops-workloads/apps/argocd-demo/environments/prod
       - kustomize edit set image app-image=$REPOSITORY_URI:$IMAGE_TAG
       - git add kustomization.yaml
       # Lines 36-39 fixed: wrap in single quotes to prevent YAML parsing colons as keys
