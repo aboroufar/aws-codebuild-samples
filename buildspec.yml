@@ -24,8 +24,11 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo "Updating GitOps workloads repository..."
-      - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+      - curl -sLo kustomize.tar.gz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz"
+      - tar -xzf kustomize.tar.gz
+      - chmod +x kustomize
       - mv kustomize /usr/local/bin/
+      - rm kustomize.tar.gz
       - git config --global user.email "ci-bot@yourdomain.com"
       - git config --global user.name "CodeBuild CI"
       - git clone https://${GITHUB_TOKEN}@github.com/aboroufar/gitops-workloads.git
