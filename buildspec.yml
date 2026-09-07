@@ -4,7 +4,7 @@ phases:
   pre_build:
     commands:
       - echo "Logging in to Amazon ECR..."
-      - IMAGE_REPO_NAME=${IMAGE_REPO_NAME:-argocd-demo-repo}
+      - IMAGE_REPO_NAME=${IMAGE_REPO_NAME:-argocd-demo}
       - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
@@ -23,18 +23,27 @@ phases:
       - echo "Pushing Docker images to ECR..."
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "Updating GitOps workloads repository..."
+      - echo "Configuring SSH key for gitops-workloads..."
+      # 1. Write the SSH private key from the environment variable
+      - mkdir -p ~/.ssh
+      - echo "$SSH_DEPLOY_KEY" > ~/.ssh/id_ed25519
+      - chmod 600 ~/.ssh/id_ed25519
+      - ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts
+      # 2. Force Git to use this specific key and disable interactive prompts
+      - export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+      # 3. Install Kustomize binary directly
       - curl -sLo kustomize.tar.gz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz"
-      - tar -xzf kustomize.tar.gz
-      - chmod +x kustomize
-      - mv kustomize /usr/local/bin/
-      - rm kustomize.tar.gz
+      - tar -xzf kustomize.tar.gz && chmod +x kustomize && mv kustomize /usr/local/bin/ && rm kustomize.tar.gz
+      # 4. Configure Git identity
       - git config --global user.email "ci-bot@yourdomain.com"
       - git config --global user.name "CodeBuild CI"
-      - git clone https://${GITHUB_TOKEN}@github.com/aboroufar/gitops-workloads.git
+      # 5. Clone using SSH URL (replace <YOUR_GITHUB_USER_OR_ORG> with your actual GitHub username or org)
+      - git clone git@github.com:aboroufar/gitops-workloads.git
       - cd gitops-workloads/apps/argocd-demo/environments/prod
+      # 6. Update image tag using Kustomize
       - kustomize edit set image app-image=$REPOSITORY_URI:$IMAGE_TAG
       - git add kustomization.yaml
-      # Lines 36-39 fixed: wrap in single quotes to prevent YAML parsing colons as keys
       - 'git commit -m "ci(deploy): update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"'
+      # 7. Ensure remote URL is SSH and push
+      - git remote set-url origin git@github.com:aboroufar/gitops-workloads.git
       - git push origin main
