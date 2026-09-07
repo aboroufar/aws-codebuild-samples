@@ -4,7 +4,7 @@ phases:
   pre_build:
     commands:
       - echo "Logging in to Amazon ECR..."
-      - IMAGE_REPO_NAME=${IMAGE_REPO_NAME:-blue-green-demo-repo}
+      - IMAGE_REPO_NAME=${IMAGE_REPO_NAME:-argocd-demo-repo}
       - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
@@ -24,16 +24,14 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo "Updating GitOps workloads repository..."
-      # Install Kustomize
       - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
       - mv kustomize /usr/local/bin/
-      # Configure Git using GitHub token stored in AWS Secrets Manager or CodeBuild env
       - git config --global user.email "ci-bot@yourdomain.com"
       - git config --global user.name "CodeBuild CI"
       - git clone https://${GITHUB_TOKEN}@github.com/<your-org-or-user>/gitops-workloads.git
       - cd gitops-workloads/apps/blue-green-demo/environments/prod
-      # Update image tag using kustomize
       - kustomize edit set image app-image=$REPOSITORY_URI:$IMAGE_TAG
       - git add kustomization.yaml
-      - git commit -m "ci(deploy): update image to $IMAGE_TAG [skip ci]" || echo "No changes to commit"
+      # Lines 36-39 fixed: wrap in single quotes to prevent YAML parsing colons as keys
+      - 'git commit -m "ci(deploy): update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"'
       - git push origin main
