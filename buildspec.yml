@@ -28,7 +28,7 @@ phases:
       - mv kustomize /usr/local/bin/
       - git config --global user.email "ci-bot@yourdomain.com"
       - git config --global user.name "CodeBuild CI"
-      - git clone https://${GITHUB_TOKEN}@github.com/<your-org-or-user>/gitops-workloads.git
+      - git clone https://${GITHUB_TOKEN}@github.com/aboroufar/gitops-workloads.git
       - cd gitops-workloads/apps/argocd-demo/environments/prod
       - kustomize edit set image app-image=$REPOSITORY_URI:$IMAGE_TAG
       - git add kustomization.yaml
